@@ -1,11 +1,11 @@
 #!/bin/bash
 
 # Download directories vars
-root_dl="/home/ayshrv/turbo_nobackup_datasets/kinetics700-2020"
-root_dl_targz="/home/ayshrv/turbo_datasets/kinetics700-2020_targz"
+root_dl="/home/zhaochenzhi/CRW_TAP/datasets/kinetics700-2020"
+root_dl_targz="/home/zhaochenzhi/CRW_TAP/datasets/kinetics700-2020_targz"
 
 # Make root directories
-[ ! -d $root_dl ] && mkdir $root_dl
+[ ! -d $root_dl ] && mkdir -p $root_dl
 
 
 # # Extract validation
