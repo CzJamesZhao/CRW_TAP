@@ -1,4 +1,5 @@
 # setting="CUDA_VISIBLE_DEVICES=0 python "
+# 限制OpenMP线程数为4，减少CPU线程数，加快训练；每个节点4个进程（通常对应4GPU），单节点训练
 setting="OMP_NUM_THREADS=4 torchrun --nproc_per_node 4 --nnodes 1 "
 file="train_kubric.py"
 arguments="
