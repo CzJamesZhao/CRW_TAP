@@ -1,10 +1,10 @@
 #!/bin/bash
 
 # Download directories vars
-root_dl="/home/ayshrv/turbo_datasets/kinetics700-2020"
-root_dl_targz="/home/ayshrv/turbo_datasets/kinetics700-2020_targz"
+root_dl="/home/zhaochenzhi/CRW_TAP/datasets/kinetics700-2020"
+root_dl_targz="/home/zhaochenzhi/CRW_TAP/datasets/kinetics700-2020_targz"
 
-# Make root directories
+# Check and make root directories
 [ ! -d $root_dl ] && mkdir $root_dl
 [ ! -d $root_dl_targz ] && mkdir $root_dl_targz
 
@@ -17,6 +17,7 @@ root_dl_targz="/home/ayshrv/turbo_datasets/kinetics700-2020_targz"
 curr_dl=${root_dl_targz}/train
 [ ! -d $curr_dl ] && mkdir -p $curr_dl
 wget -c -i https://s3.amazonaws.com/kinetics/700_2020/train/k700_2020_train_path.txt -P $curr_dl
+echo -e "kinetics700-2020 download complete!"
 
 # # Download annotations csv files
 # curr_dl=${root_dl}/annotations
