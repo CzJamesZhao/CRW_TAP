@@ -27,6 +27,8 @@ from data.tapvid import create_davis_dataset, create_rgb_stacking_dataset, creat
 from utils.metrics import compute_tapvid_metrics
 from utils import utils, tracking_utils
 from models import GMRW
+from utils.viz_utils import draw_trajs_on_rgbs
+
 
 csv.field_size_limit(sys.maxsize)
 
@@ -142,6 +144,7 @@ def run_crw(
     compute_flow_method=None, # weighted_argmax, weighted_sum
     window_threshold=None,
     eval_dataset=None,
+    model_path=None,
 ):
 
     original_rgbs = video.permute(0, 1, 4, 2, 3)  # (B, T, C, H, W)
@@ -393,7 +396,7 @@ def run_crw(
     viz_outputs['trajs_e'] = trajectories
     viz_outputs['visibility'] = visibilities
 
-    pred_tracks = trajectories.permute(0, 2, 1, 3) # (B, N, T, 2)
+    pred_tracks = trajectories.permute(0, 2, 1, 3) # (B, N, T, 2), 最后一个维度是（x,y）
     occluded = (visibilities == False).permute(0, 2, 1) # (B, N, T)
 
     query_points = query_points.cpu().numpy()  # (B, N, mer3)
@@ -412,7 +415,54 @@ def run_crw(
     )
 
     metrics["total_count"] = np.array([1])
+
+    # 尝试进行可视化，并且存储视频
+    # 转换 pred_tracks 的形状为 (B, T, N, 2)
+    pred_tracks = np.transpose(pred_tracks, (0, 2, 1, 3))
+
+    # 获取视频数据，形状为 (B, T, H, W, C)
+    video = video.cpu().numpy()
+
+    #对每个样本进行可视化
+    for b in range(video.shape[0]):
+        # 读取单个视频
+        frames = video[b]
+        tracks = pred_tracks[b]
+        visibility = visibilities[b]
+
+        # 在视频上绘制轨迹
+        video_with_tracks = draw_trajs_on_rgbs(
+            frames,
+            tracks,
+            visibilities=visibility,
+            valids=None,
+            texts=None,
+            show_dots=True,
+            cmap="coolwarm",
+            linewidth=1,
+        )
+
+        # 保存视频
+        output_video_path = f"/home/zhaochenzhi/CRW_TAP/results/{eval_dataset}/{model_path.split('/')[-1].split('.')[0]}"
+        os.makedirs(output_video_path, exist_ok=True)
+        output_video_path = f"/home/zhaochenzhi/CRW_TAP/results/{eval_dataset}/{model_path.split('/')[-1].split('.')[0]}/{global_step}_tracks.mp4"
+        save_frames_as_video(video_with_tracks, output_video_path, fps=10)
+
     return metrics
+
+# 定义一个将帧列表转换为视频的函数
+import cv2
+def save_frames_as_video(frames, output_path, fps=30):
+    height,width,_ = frames[0].shape
+    video_writer = cv2.VideoWriter(output_path, cv2.VideoWriter_fourcc(*'mp4v'), fps, (width, height))
+
+    for frame in frames:
+        # opencv使用的是BGR格式，而matplotlib使用的是RGB格式，因此需要转换
+        frame = cv2.cvtColor(frame.astype(np.uint8), cv2.COLOR_RGB2BGR)
+        video_writer.write(frame)
+    video_writer.release()
+    print(f"Video saved to {output_path}")
+
 
 
 def add_to_metrics(overall_metrics, new_metrics):
@@ -480,7 +530,8 @@ def save_tsv(filename, tsv_fields, data):
         writer = csv.DictWriter(tsvfile, delimiter="\t", fieldnames=tsv_fields)
         for i, item in enumerate(data):
             encoded_item = {
-                k: str(v) if isinstance(v, int) else str(base64.b64encode(np.ascontiguousarray(v)), "utf-8")
+                # k: str(v) if isinstance(v, int) else str(base64.b64encode(np.ascontiguousarray(v)), "utf-8")
+                k: str(v) if isinstance(v, int) else base64.b64encode(np.ascontiguousarray(v)).decode("utf-8")
                 for k, v in item.items()
             }
             writer.writerow(encoded_item)
@@ -499,7 +550,8 @@ def get_eval_input_from_davis(query_mode, local_rank=None, world_rank=None):
     if local_rank is None:
         local_rank = -1
         world_rank = -1
-    davis_points_path = "datasets/tapvid_davis/tapvid_davis.pkl"
+    # davis_points_path = "datasets/tapvid_davis/tapvid_davis.pkl"
+    davis_points_path = "/home/zhaochenzhi/CRW_TAP/datasets/tapvid_davis/tapvid_davis.pkl"
     yield from create_davis_dataset(
         davis_points_path, query_mode=query_mode, local_rank=local_rank, world_rank=world_rank
     )
@@ -632,12 +684,14 @@ def main(
                 compute_flow_method=compute_flow_method,
                 window_threshold=window_threshold,
                 eval_dataset=eval_dataset,
+                model_path = model_path
             )
 
         # print(f"Video: {i}")
         # print(metrics)
 
         overall_metrics = add_to_metrics(overall_metrics, metrics)
+
 
 
 
@@ -652,6 +706,19 @@ def main(
     overall_metrics = {
         k: v / overall_metrics["total_count"] for k, v in overall_metrics.items()
     }
+
+    # 将最终的metrics用tsv保存下来
+    # 准备表头和数据
+    tsv_fields = list(overall_metrics.keys())  # 字段名称
+    data = [metrics]  # 数据为一个字典列表
+
+    # 保存为 TSV 文件
+    from datetime import datetime
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    output_tsv_path = f"/home/zhaochenzhi/CRW_TAP/results/{eval_dataset}/{model_path.split('/')[-1].split('.')[0]}"
+    os.makedirs(output_tsv_path, exist_ok=True)
+    output_tsv_path = f"/home/zhaochenzhi/CRW_TAP/results/{eval_dataset}/{model_path.split('/')[-1].split('.')[0]}/evaluation_metrics_{timestamp}.tsv"
+    save_tsv(output_tsv_path, tsv_fields, data)
 
     if args.local_rank in [-1, 0]:
         print_metrics(overall_metrics)

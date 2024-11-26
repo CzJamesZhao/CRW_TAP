@@ -1,5 +1,5 @@
 import ctypes
-
+# ctypes库加载了共享库 libgcc_s.so.1，确保Python程序能够正常调用GCC编译的动态库
 libgcc_s = ctypes.CDLL("libgcc_s.so.1")
 
 import datetime
@@ -20,7 +20,7 @@ from data import datasets
 from models import GMRW
 from utils import tracking_utils, utils, viz_utils
 
-torch.autograd.set_detect_anomaly(True)
+torch.autograd.set_detect_anomaly(True) # 启用异常检测，有助于调试梯度问题。
 import tensorflow as tf
 tf.config.experimental.set_visible_devices([], "GPU")
 
@@ -382,6 +382,7 @@ def main(args):
         "num_transformer_layers": 6,
         "norm": args.disable_transforms,
         "flash_attention": args.use_flash_attention,
+        # "flash_attention": True,
         "gradient_checkpointing": args.use_gradient_checkpointing,
     }
     model = GMRW(**gmrw_kwargs)

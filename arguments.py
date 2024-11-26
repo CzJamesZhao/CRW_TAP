@@ -19,7 +19,8 @@ def train_args(string=None):
     ## Data paths args
     parser.add_argument(
         "--data_path",
-        default="datasets/movi/",
+        # default="datasets/movi/",
+        default="/home/zhaochenzhi/CRW_TAP/datasets/movi",
         help="Dataset path",
     )
 
@@ -244,7 +245,7 @@ def train_args(string=None):
         args = parser.parse_args()
 
     try:
-        args.local_rank = int(os.environ["LOCAL_RANK"])
+        args.local_rank = int(os.environ["LOCAL_RANK"]) # set by torch.distributed.launch, 一个gpu 进程对应一个rank,具体到每个进程应该是0，1，2，3
     except:
         args.local_rank = -1
 

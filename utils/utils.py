@@ -379,6 +379,60 @@ def save_single_step_html(
     )  # 2858 × 446
     html_page.save()
 
+def get_free_gpus(threshold=0.1):
+    """
+    查询系统中所有空闲的 GPU。
+    参数:
+        - threshold: GPU 显存使用率阈值，小于此值的 GPU 被认为是空闲的 (默认 10%)。
+    返回:
+        - free_gpus: 一个包含空闲 GPU 索引的列表，如果没有空闲 GPU，则返回空列表。
+    """
+    try:
+        import pynvml
+        pynvml.nvmlInit()
+        device_count = pynvml.nvmlDeviceGetCount()
+        free_gpus = []
+
+        for i in range(device_count):
+            handle = pynvml.nvmlDeviceGetHandleByIndex(i)
+            mem_info = pynvml.nvmlDeviceGetMemoryInfo(handle)
+            if mem_info.used / mem_info.total < threshold:  # 使用率低于阈值
+                free_gpus.append(i)
+
+        pynvml.nvmlShutdown()
+        return free_gpus
+    except ModuleNotFoundError:
+        print("pynvml is not installed. Install it with `pip install nvidia-ml-py`.")
+        return []
+    except Exception as e:
+        print(f"Error querying free GPU: {str(e)}")
+        return []
+
+
+# def setup_device_training(args):
+#     # Setup CPU, CUDA, GPU & distributed training
+#     free_gpus = get_free_gpus(threshold=0.1)
+#     print(f"free_gpus:{free_gpus}")
+#     device = None
+#     if args.local_rank == -1:
+#         device = torch.device("cpu")
+#         args.local_rank = -2
+#         args.n_gpu = -1
+#         if torch.cuda.is_available():
+#             device = torch.device("cuda")
+#             args.local_rank = -1
+#             # args.n_gpu = torch.cuda.device_count()
+#             args.n_gpu = len(free_gpus)
+#     else:  # Initializes the distributed backend which will take care of sychronizing nodes/GPUs
+#         # torch.cuda.set_device(args.local_rank)
+#         torch.cuda.set_device(free_gpus[args.local_rank]) # 通过torchrun启动分布式训练后，每个进程的local_rank就是进程号，从0开始
+#         # device = torch.device("cuda", args.local_rank)
+#         device = torch.device("cuda", free_gpus[args.local_rank]) # 根据进程号选择free gpu, 不会和别人的进程冲突
+#         torch.distributed.init_process_group(backend="nccl")
+#         args.n_gpu = 1
+#     args.device = device
+
+#     return args
 
 def setup_device_training(args):
     # Setup CPU, CUDA, GPU & distributed training

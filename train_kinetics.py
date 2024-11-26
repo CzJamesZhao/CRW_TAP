@@ -1,5 +1,5 @@
 import ctypes
-
+# 为了简单的C++库能正常使用
 libgcc_s = ctypes.CDLL("libgcc_s.so.1")
 
 import datetime
@@ -89,19 +89,20 @@ def train_one_epoch(
     html_page=None,
 ):
     global GLOBAL_STEP
-    model.train()
+    model.train() # 将模型设置为训练模式。这会启用某些特定于训练的功能（如 Dropout 和 BatchNorm）
     metric_logger = utils.MetricLogger(delimiter="  ")
     metric_logger.meters.update(GLOBAL_STEP=GLOBAL_STEP)
 
     header = "Epoch: [{}]".format(epoch)
 
-    for step, item in enumerate(
+    for step, item in enumerate( 
         metric_logger.log_every(data_loader, args.print_freq, header)
-    ):  
+    ):   # step 是当前batch的索引，item是当前batch的数据，每个GPU上是通过DistributedSampler独立随机采样的，batch的大小是batch_size_per_gpu。
+        # item:frames (B,2*T,3,H,W)
 
         start_time = time.time()
-        optimizer.zero_grad(set_to_none=True)
-        torch.cuda.empty_cache()
+        optimizer.zero_grad(set_to_none=True) # 清空上一轮的梯度，避免梯度积累
+        torch.cuda.empty_cache()  # 释放 GPU 中未使用的显存，以减少显存占用
 
         item = [i.to(args.device) for i in item]
 
@@ -125,11 +126,11 @@ def train_one_epoch(
                 ) * (end_value - start_value) / (end_iter - start_iter)
 
         (
-            frames,
-            affine_mat_b2f,
-        ) = item
+            frames, # (B,2*T,3,H,W)
+            affine_mat_b2f, # （B,2,3）
+        ) = item 
 
-        with autocast(enabled=args.use_amp, device_type="cuda", dtype=torch.bfloat16):
+        with autocast(enabled=args.use_amp, device_type="cuda", dtype=torch.bfloat16): # autocast:PyTorch 提供的自动混合精度上下文管理器，用于在模型推理时启用混合精度训练,有的地方使用半精度加速训练
             all_pairs, loss, diagnostics, variables_log = model(
                 frames,
                 affine_mat_b2f,
@@ -253,12 +254,13 @@ def train_one_epoch(
         torch.cuda.empty_cache()
 
 
-@record
+@record # 装饰器，用于在分布式训练中记录多进程错误
 def main(args):
     utils.create_output_dir(args)
     utils.setup_logging(args)
 
-    if args.local_rank in [-2, -1, 0]:
+    # 根据本地排名设置HTML页面，用于可视化
+    if args.local_rank in [-2, -1, 0]:  # 在分布式训练开始后就只对rank 0创建html了
         html_page = utils.setup_html_page(
             args, html_filename=f"index_train_{args.html_filename}.html"
         )
@@ -297,7 +299,8 @@ def main(args):
         "ffn_dim_expansion": 4,
         "num_transformer_layers": 6,
         "norm": args.disable_transforms,
-        "flash_attention": args.use_flash_attention,
+        "flash_attention": args.use_flash_attention, # 默认是False,可以改成True试一试显存占用是不是能减少。
+        # "flash_attention": True,
         "gradient_checkpointing": args.use_gradient_checkpointing,
     }
     model = GMRW(**gmrw_kwargs)
@@ -308,6 +311,7 @@ def main(args):
     if args.local_rank in [-2, -1, 0]:
         wandb.watch(model)
 
+    # 预训练
     if args.pretrained_gmflow:
         gmflow_model_dict = torch.load(
             args.pretrained_gmflow_path, map_location=args.device
@@ -327,7 +331,7 @@ def main(args):
     non_parallel_model = model
     if args.n_gpu > 1:
         model = torch.nn.DataParallel(model)
-        non_parallel_model = model.module
+        non_parallel_model = model.module # 在分布式训练中，只对rank 0进行参数共享，其他rank不共享参数，只共享梯度。使用.module可以访问参数。
 
     if args.local_rank not in [-2, -1]:
         model = torch.nn.parallel.DistributedDataParallel(

@@ -8,7 +8,7 @@ import torch.nn.functional as F
 
 
 class BaseTransform(torch.nn.Module):
-    @abstractmethod
+    @abstractmethod # 这是一个抽象基类
     def __call__(self, images, flows, extra_tensors=None):
         pass
 
@@ -44,7 +44,7 @@ class ToTensor(BaseTransform):
         self.convert_to_float = convert_to_float
         self.device = device
 
-    def __call__(
+    def __call__( # （T，H,W,C） --> (T,C,H,W)
         self,
         images,
         flows=None,
@@ -116,9 +116,9 @@ class RandomResizedCrop(BaseTransform):
 
     def __init__(
         self,
-        size,
-        scale,
-        ratio,
+        size, # 裁剪后图像的目标大小。
+        scale,  # 裁剪区域相对于原图面积的比例范围。
+        ratio,  # 裁剪区域宽高比的范围
         seed=786234,
     ):
         super().__init__()
@@ -127,19 +127,19 @@ class RandomResizedCrop(BaseTransform):
         self.ratio = ratio
         rng = torch.manual_seed(seed)
         self.k_aug_transform = K.RandomResizedCrop(
-            size=self.size,
-            scale=self.scale,
-            ratio=self.ratio,
+            size=self.size, # 目标裁剪后的尺寸
+            scale=self.scale, # 裁剪区域和原始图像的面积比例范围。
+            ratio=self.ratio, # 裁剪区域宽高比范围。
             same_on_batch=True,
             return_transform=True,
         )
         self.aug_params = None
 
     def _edit_aug_params(self, old_aug_params, new_shape):
-        new_B = new_shape[0]
+        new_B = new_shape[0]  # 获取新的批次大小。
         # assert old_aug_params["src"].shape[0] >= new_B
 
-        new_aug_params = {}
+        new_aug_params = {} 
         new_aug_params["forward_input_shape"] = new_shape
         new_aug_params["src"] = old_aug_params["src"][:1].repeat(new_B, 1, 1)
         new_aug_params["dst"] = old_aug_params["dst"][:1].repeat(new_B, 1, 1)
@@ -149,9 +149,9 @@ class RandomResizedCrop(BaseTransform):
 
     def __call__(
         self,
-        images,
-        flows=None,
-        extra_tensors=None,
+        images, # 输入的图像张量，形状为 (B, C, H, W)。
+        flows=None,  # 可选，光流张量，形状为 (B, 2, H, W)。
+        extra_tensors=None, # 可选，额外的张量列表
     ):
 
         B, C, H, W = images.shape

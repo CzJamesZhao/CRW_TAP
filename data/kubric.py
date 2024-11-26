@@ -25,7 +25,8 @@ class KubricDataloader:
         img_size1=None,
         img_size2=None,
         split="train",
-        root="datasets/movi/",
+        # root="datasets/movi/",
+        root = "/home/zhaochenzhi/CRW_TAP/datasets/movi",
         no_of_frames=2,
         frame_len_diff=1,
         random_frame_skip=False,
@@ -63,7 +64,7 @@ class KubricDataloader:
         assert (self.no_of_frames - 1) * self.frame_len_diff < self.total_frame_len
 
         dataset = tfds.load(
-            "movi_e/256x256",
+            "movi_e",
             data_dir=root,
             shuffle_files=shuffle,
         )

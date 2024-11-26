@@ -23,15 +23,15 @@ class KineticsDataset(data.Dataset):
         self, 
         use_frame_transform=True,
         use_color_transform=False,
-        img_size1=None,
-        img_size2=None,
+        img_size1=None, # train_kinetics.sh (512,512)
+        img_size2=None, # train_kinetics.sh (448,448)
         split="train",
-        root="datasets/kinetics700-2020",
+        root="/home/zhaochenzhi/CRW_TAP/datasets/kinetics700-2020",
         no_of_frames=2,
         frame_len_diff=20,
         random_frame_skip=False,
         random_seed=786234,
-        aug_setting="setting1",
+        aug_setting="setting1", #datasets.py中默认设置为setting2
         training=True,
     ):
 
@@ -56,37 +56,46 @@ class KineticsDataset(data.Dataset):
         self.data_root = root
         self.split = split
 
-        self.video_list = sorted(glob(osp.join(self.data_root, self.split, "*/*.mp4")))
+        # 训练集中所有视频的路径
+        self.video_list = sorted(glob(osp.join(self.data_root, self.split, "*/*.mp4"))) #glob找到所有文件夹下的mp4文件
+        print(f"Looking for videos in: {osp.join(self.data_root, self.split, '*/*.mp4')}")
 
+       # print(f"vedio list: {self.video_list}")
+
+        # 损坏视频的路径
         self.ignore_id_list = [
-            "datasets/kinetics700-2020/train/adjusting glasses/5d9mIpws4cg_000130_000140.mp4",
-            "datasets/kinetics700-2020/train/changing gear in car/A-FCzUzEd4U_000000_000010.mp4",
-            "datasets/kinetics700-2020/train/cleaning shoes/y7cYaYX4gdw_000047_000057.mp4", 
-            "datasets/kinetics700-2020/train/cracking back/SYTMgaqGhfg_000010_000020.mp4",
-            "datasets/kinetics700-2020/train/faceplanting/BSN_nDiTwBo_000004_000014.mp4",
-            "datasets/kinetics700-2020/train/flipping pancake/zLD_q2djrYs_000030_000040.mp4", 
-            "datasets/kinetics700-2020/train/gospel singing in church/NNazT7dDWxA_000130_000140.mp4",
-            "datasets/kinetics700-2020/train/making sushi/_dbw-EJqoMY_001023_001033.mp4",
-            "datasets/kinetics700-2020/train/punching bag/ixQrfusr6k8_000001_000011.mp4",
-            "datasets/kinetics700-2020/train/roller skating/FAqHwAPZfeE_000018_000028.mp4"
+            "/home/zhaochenzhi/CRW_TAP/datasets/kinetics700-2020/train/adjusting glasses/5d9mIpws4cg_000130_000140.mp4",
+            "/home/zhaochenzhi/CRW_TAP/datasets/kinetics700-2020/train/changing gear in car/A-FCzUzEd4U_000000_000010.mp4",
+            "/home/zhaochenzhi/CRW_TAP/datasets/kinetics700-2020/train/cleaning shoes/y7cYaYX4gdw_000047_000057.mp4", 
+            "/home/zhaochenzhi/CRW_TAP/datasets/kinetics700-2020/train/cracking back/SYTMgaqGhfg_000010_000020.mp4",
+            "/home/zhaochenzhi/CRW_TAP/datasets/kinetics700-2020/train/faceplanting/BSN_nDiTwBo_000004_000014.mp4",
+            "/home/zhaochenzhi/CRW_TAP/datasets/kinetics700-2020/train/flipping pancake/zLD_q2djrYs_000030_000040.mp4", 
+            "/home/zhaochenzhi/CRW_TAP/datasets/kinetics700-2020/train/gospel singing in church/NNazT7dDWxA_000130_000140.mp4",
+            "/home/zhaochenzhi/CRW_TAP/datasets/kinetics700-2020/train/making sushi/_dbw-EJqoMY_001023_001033.mp4",
+            "/home/zhaochenzhi/CRW_TAP/datasets/kinetics700-2020/train/punching bag/ixQrfusr6k8_000001_000011.mp4",
+            "/home/zhaochenzhi/CRW_TAP/datasets/kinetics700-2020/train/roller skating/FAqHwAPZfeE_000018_000028.mp4",
+            "/home/zhaochenzhi/CRW_TAP/datasets/kinetics700-2020/train/roller skating/SYMgagGhFg_000010_000022.mp4",
+            "/home/zhaochenzhi/CRW_TAP/datasets/kinetics700-2020/train/filling cake/MskiCrkcDpo_000000_000010.mp4",
         ]
 
         for video_id in self.ignore_id_list:
             if video_id in self.video_list:
                 self.video_list.remove(video_id)
 
+        # 使用第一个视频来构建transformations
         video_id = self.video_list[0]
 
         frames = media.read_video(video_id)
         
+        # 第一帧用于构建transformations
         H, W = frames[0].shape[:2]
 
         self.img_size0 = (H, W)
 
         ## Transforms related inits
         ## Non-breaking shortcuts Transforms
-        if self.use_frame_transform:
-            aspect_ratio = img_size1[0] / img_size1[1]
+        if self.use_frame_transform: # 默认为True
+            aspect_ratio = img_size1[0] / img_size1[1] # 1
             self.to_tensor = ToTensor(convert_to_float=True)
             self.random_crop = RandomResizedCrop(
                 size=img_size1,
@@ -101,7 +110,7 @@ class KineticsDataset(data.Dataset):
                     scale_H = img_size1[0] / self.img_size0[0]
                     scale_W = img_size1[1] / self.img_size0[1]
                     max_scale = max(scale_H, scale_W)
-                    new_img_size0 = (
+                    new_img_size0 = ( 
                         ceil(max_scale * self.img_size0[0]),
                         ceil(max_scale * self.img_size0[1]),
                     )
@@ -119,7 +128,7 @@ class KineticsDataset(data.Dataset):
             self.color_aug = None
 
         ## Breaking shortcuts Transforms
-        self.aspect_ratio = img_size2[0] / img_size2[1]
+        self.aspect_ratio = img_size2[0] / img_size2[1] # 1
         # Args for RandomResizedCrop
         if aug_setting == "setting1":
             self.aug_scale = [0.08, 1.0]
@@ -192,13 +201,14 @@ class KineticsDataset(data.Dataset):
         frame1 = frames[frame1_idx]
         frame2 = frames[frame2_idx]
 
-        frames = [frame1, frame2]
+        frames = [frame1, frame2] # (T,H,W,C)
         
         # frames: (T, C, H, W), float, 0-255
         ##########################
 
         frames, _, _ = self.to_tensor(frames)
 
+        # 这里好像H，W取出错误了，应该是(T,C，H，W)，但后面的代码重新取了，所以不影响
         T, H, W, _ = frames.shape
 
         if self.use_frame_transform:
@@ -208,12 +218,12 @@ class KineticsDataset(data.Dataset):
                 frames, _, _ = self.center_crop_1(frames)
             frames, _, _, _ = self.random_crop(frames)
 
-        if self.color_aug:
+        if self.color_aug: # 颜色增强
             frames_aug = []
             for t in range(frames.shape[0]):
                 frames_aug.append(self.color_aug(frames[t]))
             frames = torch.stack(frames_aug, dim=0)
-        else:
+        else: # 数据归一化[0,1]
             frames = frames / 255.0
 
         # frames: float, 0-1
@@ -224,7 +234,9 @@ class KineticsDataset(data.Dataset):
         frames = frames.reshape(T, 3, H, W)
 
         # color augmentation
-        # (T, 3, H, W)
+        # (T, 3, H, W)， T=2
+        # 由于默认不启动颜色增强
+        # 直接返回 原始帧，原始帧在时间维度的翻转（T反向）
         frames_forward, frames_backward = self.color_augment(frames)
         
         if self.center_crop_2 is not None:
@@ -256,7 +268,7 @@ class KineticsDataset(data.Dataset):
 
         H, W = frames_forward.shape[2:]
 
-        # frames: 2*(T-1), 3, H, W
+        # frames: 2*(T), 3, H, W
         frames = torch.cat((frames_forward, frames_backward), dim=0)
 
         affine_mat_backward_inv = torch.inverse(affine_mat_backward[0])
@@ -269,6 +281,7 @@ class KineticsDataset(data.Dataset):
 
         # H, W: img_size2
         # frames: (2*T, 3, H, W), float, 0-1
+        # affine_mat_b2f: (2, 3)
 
         return (
             frames,
@@ -277,18 +290,23 @@ class KineticsDataset(data.Dataset):
 
 
     def color_augment(self, frames):
+        #  # 定义用于存储正向增强帧和反向增强帧的列表
         frames_aug = []
         frames_aug_back = []
-        if isinstance(self.color_aug, tuple):
+        if isinstance(self.color_aug, tuple): # color_aug默认是None,没有启用颜色增强
             for t in range(frames.size(0)):
+                # 遍历所有帧，依次对每一帧应用正向的颜色增强（self.color_aug[0]）
                 frames_aug.append(self.color_aug[0](frames[t]))
             for t in reversed(range(frames.size(0))):
+                 # 遍历所有帧的逆序，依次对每一帧应用反向的颜色增强（self.color_aug[1]）
                 frames_aug_back.append(self.color_aug[1](frames[t]))
         elif self.color_aug is None:
+            # 如果 self.color_aug 为 None，则直接返回原始帧，以及帧的时间维度翻转版本
             return frames, frames.flip(0)
         else:
             for t in range(frames.size(0)):
                 frames_aug.append(self.color_aug(frames[t]))
             for t in reversed(range(frames.size(0))):
                 frames_aug_back.append(self.color_aug(frames[t]))
+        # 将增强后的帧转换为张量并返回，此时帧的维度为 (T, C, H, W)，并且前后两个张量的时间维度是翻转的
         return torch.stack(frames_aug, dim=0), torch.stack(frames_aug_back, dim=0)

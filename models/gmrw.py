@@ -29,7 +29,7 @@ class GMRW(nn.Module):
     def __init__(
         self, 
         args,
-        num_scales=1,
+        num_scales=1, # 训练中默认为2
         upsample_factor=8,
         feature_channels=128,
         attention_type="swin",
@@ -299,9 +299,9 @@ class GMRW(nn.Module):
         self.H = H
         self.W = W
 
-        self.T = int(self.T / 2)
+        self.T = int(self.T / 2) # 除以2因为有frames_forward&frames_backward, each with 2 frames
 
-        assert self.T == self.args.no_of_frames
+        assert self.T == self.args.no_of_frames # 2
         assert self.C == 3
 
         variables_log = {}
