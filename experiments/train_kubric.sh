@@ -20,7 +20,7 @@ arguments="
 --epochs 5000
 --visualize
 --exp_name train_kubric
---resume /home/zhaochenzhi/CRW_TAP/experiments/results/train_kubric_0/checkpoints/model_4000.pth
+--resume /home/zhaochenzhi/CRW_TAP/experiments/results/train_kubric_1/checkpoints/model_73000.pth
 "
 command_to_run="${setting} ${file} ${arguments}"
 

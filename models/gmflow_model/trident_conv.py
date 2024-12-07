@@ -20,7 +20,7 @@ class MultiScaleTridentConv(nn.Module):
         dilation=1,
         groups=1,
         num_branch=1,
-        test_branch_idx=-1,
+        test_branch_idx=-1, # 如果模型处于测试阶段，选择某个分支进行测试
         bias=False,
         norm=None,
         activation=None,
@@ -57,17 +57,17 @@ class MultiScaleTridentConv(nn.Module):
         else:
             self.bias = None
 
-        nn.init.kaiming_uniform_(self.weight, nonlinearity="relu")
+        nn.init.kaiming_uniform_(self.weight, nonlinearity="relu") # 对卷积核的权重进行 Kaiming 初始化，适用于 ReLU 激活函数，目的是避免梯度消失或爆炸。
         if self.bias is not None:
             nn.init.constant_(self.bias, 0)
 
     def forward(self, inputs):
         num_branch = (
             self.num_branch if self.training or self.test_branch_idx == -1 else 1
-        )
+        ) # kinetics训练时设置为2
         assert len(inputs) == num_branch
 
-        if self.training or self.test_branch_idx == -1:
+        if self.training or self.test_branch_idx == -1: #训练时返回多尺度
             outputs = [
                 F.conv2d(
                     input,
@@ -81,7 +81,7 @@ class MultiScaleTridentConv(nn.Module):
                 for input, stride, padding in zip(inputs, self.strides, self.paddings)
             ]
         else:
-            outputs = [
+            outputs = [ # 测试时只返回第一个分支
                 F.conv2d(
                     inputs[0],
                     self.weight,

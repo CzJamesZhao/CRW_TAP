@@ -66,7 +66,7 @@ def merge_splits(
     return merge
 
 def feature_add_position(feature0, feature1, attn_splits, feature_channels):
-    pos_enc = PositionEmbeddingSine(num_pos_feats=feature_channels // 2)
+    pos_enc = PositionEmbeddingSine(num_pos_feats=feature_channels // 2) # 正弦位置编码
 
     if attn_splits > 1:  # add position in splited window
         feature0_splits = split_feature(feature0, num_splits=attn_splits)
@@ -82,7 +82,7 @@ def feature_add_position(feature0, feature1, attn_splits, feature_channels):
         feature0_splits = feature0_splits + position0
         feature1_splits = feature1_splits + position1
 
-        feature0 = merge_splits(feature0_splits, num_splits=attn_splits)
+        feature0 = merge_splits(feature0_splits, num_splits=attn_splits) # 合并刚才的分块
         feature1 = merge_splits(feature1_splits, num_splits=attn_splits)
     else:
         position = pos_enc(feature0)
@@ -96,7 +96,7 @@ def normalize_imgs(images, divideby255=True):
     # images: (B, T, C, H, W)
     # loaded images are in [0, 255]
     # normalize by ImageNet mean and std
-    mean = torch.tensor([0.485, 0.456, 0.406]).view(1, 3, 1, 1).to(images.device)
+    mean = torch.tensor([0.485, 0.456, 0.406]).view(1, 3, 1, 1).to(images.device) # pytorch tensor的广播机制，自动对齐维度
     std = torch.tensor([0.229, 0.224, 0.225]).view(1, 3, 1, 1).to(images.device)
 
     if divideby255:

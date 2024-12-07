@@ -57,7 +57,7 @@ class GMRW(nn.Module):
         self.flash_attention = flash_attention
 
         # CNN backbone
-        self.backbone = CNNEncoder(
+        self.backbone = CNNEncoder( # 128,2
             output_dim=feature_channels, num_output_scales=num_scales
         )
 
@@ -93,16 +93,16 @@ class GMRW(nn.Module):
 
 
     def extract_feature(self, img0, img1):
-        b1 = img0.shape[0]
-        b2 = img1.shape[0]
+        b1 = img0.shape[0] # B*(2T-2)
+        b2 = img1.shape[0] # B*(2T-2)
 
-        concat = torch.cat((img0, img1), dim=0)  # [2B, C, H, W]
+        concat = torch.cat((img0, img1), dim=0)  # [2B, C, H, W]; [2*B*(2T-2), C, H, W]
         features = self.backbone(
             concat
-        )  # list of [2B, C, H, W], resolution from high to low
+        )  # list of [2B, C, H, W], resolution from high to low； 返回的是[2*B*(2T-2), 128, H/4, W/4]；[2*B*(2T-2), 128, H/8, W/8]两个尺度的特征
 
         # reverse: resolution from low to high
-        features = features[::-1]
+        features = features[::-1] # 翻转分辨率 [2*B*(2T-2), 128, H/8, W/8]；[2*B*(2T-2), 128, H/4, W/4]；
 
         feature0, feature1 = [], []
 
@@ -111,7 +111,7 @@ class GMRW(nn.Module):
             feature0.append(feature[:b1])
             feature1.append(feature[b1:])
 
-        return feature0, feature1
+        return feature0, feature1  # [2*B*(2T-2), 128, H/8, W/8]；[2*B*(2T-2), 128, H/4, W/4]
 
     def prepare_images(self, images1, images2):
         # images1, images2: (B, 2*T-2, C, H, W)
@@ -149,18 +149,18 @@ class GMRW(nn.Module):
         # resolution low to high
         feature1_list, feature2_list = self.extract_feature(
             images1, images2
-        )  # list of features
+        )  # list of features [[2*B*(2T-2), 128, H/8, W/8]]；[[2*B*(2T-2), 128, H/4, W/4]] 低分辨率到高分辨率。实际训练中B=1，T=2
         
         # hi_res_features:
         features_idx = 1
 
-        feature1, feature2 = feature1_list[features_idx], feature2_list[features_idx]
+        feature1, feature2 = feature1_list[features_idx], feature2_list[features_idx] # [2*B*(2T-2), 128, H/8, W/8]；[2*B*(2T-2), 128, H/4, W/4]
 
         _, self.C_, self.H_, self.W_ = feature1.shape
 
         # add position to features
-        feature1, feature2 = feature_add_position(
-            feature1, feature2, self.attn_splits, self.feature_channels
+        feature1, feature2 = feature_add_position( # 为特征图添加位置编码
+            feature1, feature2, self.attn_splits, self.feature_channels # attn_splits=2, feature_channels=128
         ) # (B*(2T-1), C_, H_, W_)
 
         # Transformer
@@ -189,9 +189,11 @@ class GMRW(nn.Module):
         return probabilities
 
     def compute_cycle_consistency_loss(self, images1, images2, affine_mat_b2f):
-        # images1, images2: (B, T, C, H, W)
+        # images1, images2: (B, 2T-2, C, H, W) (1, 2, 3, H, W)
+        # images1:2帧，T1,T2,forward_transform
+        # images2:2帧，T2,T1, 前者forward_transform，后者backward_transform 
         
-        # flat_images: (B*T, C, H, W)
+        # flat_images: (B*(2T-2), C, H, W)
         flat_images1, flat_images2 = self.prepare_images(images1, images2)
 
         probabilities = self.run_gmflow(
@@ -307,20 +309,20 @@ class GMRW(nn.Module):
         variables_log = {}
         diags = {}
 
-        # [B, 2*T, 3, H, W]
-        images = normalize_imgs(x, divideby255=self.norm)
+        # [B, 2*T, 3, H, W]， T1，T2，T2,T1
+        images = normalize_imgs(x, divideby255=self.norm)  # 对输入的frames进行归一化（使用ImageNet的均值和方差）
 
         # [B, T, 3, H, W]
         # forward_images: 1, 2, ..., n-1, n
         # backward_images: n', (n-1)', ..., 2', 1'
-        forward_images = images[:, : self.T]
-        backward_images = images[:, self.T :]
+        forward_images = images[:, : self.T] # T1, T2
+        backward_images = images[:, self.T :] # T2,T1
 
         # images1: 1, 2, ..., n-1,   n   , (n-1)', ..., 3', 2'
         # images2: 2, 3, ...,  n , (n-1)', (n-2)', ..., 2', 1'
-        # images1, images2: (B, 2*T-2, C, H, W)
-        images1 = torch.cat([forward_images, backward_images[:, 1:-1]], dim=1)
-        images2 = torch.cat([forward_images[:, 1:], backward_images[:, 1:]], dim=1)
+        # images1, images2: (B, 2*T-1, C, H, W)
+        images1 = torch.cat([forward_images, backward_images[:, 1:-1]], dim=1) # (B, 2*T-2, C, H, W) (1, 2, 3, H, W) ; T1,T2,都是forward_transform
+        images2 = torch.cat([forward_images[:, 1:], backward_images[:, 1:]], dim=1) # (B, 2*T-2, C, H, W) (1, 3, 3, H, W); T2,T1, 前者为forward_transform，后者为backward_transform
 
         (
             all_pairs,

@@ -123,7 +123,7 @@ def compute_tapvid_metrics(
 
     # Don't evaluate the query point.  Numpy doesn't have one_hot, so we
     # replicate it by indexing into an identity matrix.
-    one_hot_eye = np.eye(gt_tracks.shape[2])
+    one_hot_eye = np.eye(gt_tracks.shape[2]) # 根据时间T生成一个单位矩阵
     query_frame = query_points[..., 0]
     query_frame = np.round(query_frame).astype(np.int32)
     evaluation_points = one_hot_eye[query_frame] == 0

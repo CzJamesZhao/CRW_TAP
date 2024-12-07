@@ -61,11 +61,11 @@ class CNNEncoder(nn.Module):
         self,
         output_dim=128,
         norm_layer=nn.InstanceNorm2d,
-        num_output_scales=1,
+        num_output_scales=1, # 训练中设置为2
         **kwargs,
     ):
         super(CNNEncoder, self).__init__()
-        self.num_branch = num_output_scales
+        self.num_branch = num_output_scales  # 训练中设置为2
 
         feature_dims = [64, 96, 128]
 
@@ -126,30 +126,32 @@ class CNNEncoder(nn.Module):
 
     def _make_layer(self, dim, stride=1, dilation=1, norm_layer=nn.InstanceNorm2d):
         layer1 = ResidualBlock(
-            self.in_planes, dim, norm_layer=norm_layer, stride=stride, dilation=dilation
+            self.in_planes, dim, norm_layer=norm_layer, stride=stride, dilation=dilation # 第一层残差块的作用是调整输入特征的通道数和空间尺寸，使其匹配新的输出特征维度
         )
         layer2 = ResidualBlock(
-            dim, dim, norm_layer=norm_layer, stride=1, dilation=dilation
+            dim, dim, norm_layer=norm_layer, stride=1, dilation=dilation # 第二层残差块的作用是进一步处理特征，同时保持通道数和空间尺寸不变。
         )
 
         layers = (layer1, layer2)
 
-        self.in_planes = dim
+        self.in_planes = dim 
+        # 将当前层的输出通道数 dim 保存到 self.in_planes 中，作为后续层的输入通道数。
+        # 这是构建层级式网络（例如 ResNet）的常见做法，因为每一层的输出需要成为下一层的输入。
         return nn.Sequential(*layers)
-
+ 
     def forward(self, x):
-        x = self.conv1(x)
+        x = self.conv1(x) # [2*B*(2T-2), C, H, W] -->[2*B*(2T-2), 64, H/2, W/2]
         x = self.norm1(x)
         x = self.relu1(x)
 
-        x = self.layer1(x)  # 1/2
-        x = self.layer2(x)  # 1/4
-        x = self.layer3(x)  # 1/8 or 1/4
+        x = self.layer1(x)  # 1/2 [2*B*(2T-2), 64, H/2, W/2] --> [2*B*(2T-2), 64, H/2, W/2]
+        x = self.layer2(x)  # 1/4 [2*B*(2T-2), 64, H/2, W/2] --> [2*B*(2T-2), 96, H/4, W/4]
+        x = self.layer3(x)  # 1/8 or 1/4  [2*B*(2T-2), 96, H/4, W/4] --> [2*B*(2T-2), 128, H/4, W/4]
 
-        x = self.conv2(x)
+        x = self.conv2(x) # [2*B*(2T-2), 128, H/4, W/4] --> [2*B*(2T-2), 128, H/4, W/4]
 
         if self.num_branch > 1:
-            out = self.trident_conv([x] * self.num_branch)  # high to low res
+            out = self.trident_conv([x] * self.num_branch)  # high to low res [2*B*(2T-2), 128, H/4, W/4]；[2*B*(2T-2), 128, H/8, W/8]
         else:
             out = [x]
 
